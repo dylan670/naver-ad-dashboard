@@ -2,11 +2,17 @@ const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
 const https = require('https');
+const path = require('path'); // 💥 추가: 파일 경로 찾아주는 도구
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
+
+// 💥 추가: 주소 뒤에 귀찮게 이름 안 붙여도 바로 화면 띄워주기!
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'ad-dashboard.html'));
+});
 
 const CONFIG = {
   HOSTNAME: 'api.searchad.naver.com',
