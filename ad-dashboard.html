@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>네이버 검색광고 실시간 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f1117;--bg2:#181c27;--bg3:#1e2334;--bg4:#252b3b;
+    --border:#2e3650;--border2:#3d4a6b;
+    --text:#e8ecf4;--text2:#8b95b0;--text3:#5a6380;
+    --naver:#00c73c;--accent:#5b8ff9;
+    --success:#34d399;--danger:#f87171;--warn:#fbbf24;
+    --r:10px;--r2:6px;
+  }
+  body{font-family:'Pretendard',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
+  .app{max-width:1450px;margin:0 auto;padding:24px 20px}
+  
+  .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px}
+  .header-left{display:flex;align-items:center;gap:10px}
+  .header-left h1{font-size:22px;font-weight:700;letter-spacing:-0.5px}
+  .live-indicator{display:flex;align-items:center;gap:6px;background:var(--bg3);padding:4px 10px;border-radius:20px;border:1px solid var(--border)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--text3)}
+  .dot.live{background:var(--success);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .stext{font-size:12px;color:var(--text2);font-weight:500}
+
+  .control-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:24px;display:flex;flex-wrap:wrap;gap:20px;align-items:center}
+  .control-group{display:flex;flex-direction:column;gap:8px}
+  .control-label{font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase}
+  
+  .date-inputs{display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);padding:8px 12px;border-radius:var(--r2)}
+  .date-inputs input{background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;outline:none}
+  .date-inputs input::-webkit-calendar-picker-indicator{filter:invert(0.7)}
+  
+  .btn-group{display:flex;gap:4px;background:var(--bg3);padding:4px;border-radius:var(--r2);border:1px solid var(--border)}
+  .btn-tab{padding:6px 16px;font-size:13px;font-weight:600;border:none;background:transparent;color:var(--text3);cursor:pointer;border-radius:4px;transition:all .2s}
+  .btn-tab.active{background:var(--bg4);color:var(--text)}
+  .btn-tab.active.naver{color:var(--naver)}
+
+  .refresh-btn{padding:10px 20px;background:var(--naver);color:#000;border:none;border-radius:var(--r2);font-weight:700;font-size:13px;cursor:pointer;margin-left:auto;display:flex;align-items:center;gap:8px;transition:transform .1s}
+  .refresh-btn:active{transform:scale(0.96)}
+
+  .err-box{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--danger);padding:14px;border-radius:var(--r2);margin-bottom:20px;font-size:13px;display:none;white-space:pre-line}
+
+  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+  .m-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:20px;position:relative;overflow:hidden;transition:border-color .2s}
+  .m-card:hover{border-color:var(--accent)}
+  .m-card::after{content:'';position:absolute;top:0;left:0;width:3px;height:100%}
+  .m-card.spend::after{background:var(--accent)}
+  .m-card.imp::after{background:#a78bfa}
+  .m-card.conv::after{background:var(--success)}
+  .m-card.rev::after{background:var(--warn)}
+  .m-label{font-size:12px;color:var(--text2);margin-bottom:10px;font-weight:500}
+  .m-value{font-size:26px;font-weight:700;letter-spacing:-0.5px}
+  .m-sub{font-size:11px;color:var(--text3);margin-top:8px;display:flex;justify-content:space-between}
+
+  .view-container{display:grid;grid-template-columns:1fr;gap:24px}
+  
+  .chart-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:24px;position:relative}
+  .box-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+  .box-title{font-size:15px;font-weight:700}
+  .chart-wrap{height:300px;position:relative}
+
+  .table-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+  .table-header{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .breadcrumb{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text2)}
+  .bc-item{cursor:pointer;transition:color .2s}
+  .bc-item:hover{color:var(--text)}
+  .bc-item.active{color:var(--naver);font-weight:700;cursor:default}
+  .bc-sep{color:var(--text3);font-size:10px}
+
+  .table-scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse}
+  th{padding:12px 20px;background:var(--bg3);color:var(--text2);font-size:11px;font-weight:700;text-transform:uppercase;text-align:right;border-bottom:1px solid var(--border);letter-spacing:0.5px}
+  th:first-child{text-align:left}
+  td{padding:14px 20px;text-align:right;border-bottom:1px solid rgba(46,54,80,0.5);font-size:13px;white-space:nowrap}
+  td:first-child{text-align:left;max-width:300px;overflow:hidden;text-overflow:ellipsis}
+  tr:hover td{background:var(--bg3)}
+  .clickable{color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+  .clickable:hover{color:var(--text)}
+
+  .tag{padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;background:var(--bg4);color:var(--text3)}
+  .tag.green{background:rgba(52,211,153,0.1);color:var(--success)}
+
+  .loading-overlay{position:absolute;inset:0;background:rgba(15,17,23,0.8);z-index:20;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+  .loading-overlay.show{display:flex}
+  .spinner{width:30px;height:30px;border:3px solid var(--border);border-top-color:var(--naver);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  @media(max-width:800px){
+    .control-panel{flex-direction:column;align-items:stretch}
+    .metrics-grid{grid-template-columns:1fr 1fr}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="header">
+    <div class="header-left">
+      <h1>광고 성과 인텔리전스</h1>
+      <div class="live-indicator">
+        <div class="dot live" id="liveDot"></div>
+        <span class="stext" id="statusText">연결 준비됨</span>
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:11px;color:var(--text3)">Last Sync</div>
+      <div style="font-size:12px;color:var(--text2)" id="lastUpdated">-</div>
+    </div>
+  </div>
+
+  <div class="err-box" id="errBox"></div>
+
+  <div class="control-panel">
+    <div class="control-group">
+      <span class="control-label">데이터 기간</span>
+      <div class="date-inputs">
+        <input type="date" id="dateFrom">
+        <span style="color:var(--text3)">~</span>
+        <input type="date" id="dateTo">
+      </div>
+    </div>
+    
+    <div class="control-group">
+      <span class="control-label">데이터 소스</span>
+      <div class="btn-group">
+        <button class="btn-tab" onclick="setMode('sample')" id="modeSample">샘플</button>
+        <button class="btn-tab active naver" onclick="setMode('naver')" id="modeNaver">네이버 API</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <span class="control-label">차트 지표</span>
+      <div class="btn-group" id="metricTabs">
+        <button class="btn-tab active" data-m="spend">광고비</button>
+        <button class="btn-tab" data-m="clicks">클릭</button>
+        <button class="btn-tab" data-m="conversions">전환</button>
+        <button class="btn-tab" data-m="roas">ROAS</button>
+      </div>
+    </div>
+
+    <button class="refresh-btn" onclick="refresh()">↻ 실시간 새로고침</button>
+  </div>
+
+  <div class="metrics-grid" id="metricsGrid">
+    <div class="m-card spend"><div class="m-label">누적 광고비</div><div class="m-value" id="totSpend">₩0</div></div>
+    <div class="m-card imp"><div class="m-label">총 노출 / 클릭</div><div class="m-value" id="totImp">0 / 0</div></div>
+    <div class="m-card conv"><div class="m-label">총 전환수</div><div class="m-value" id="totConv">0</div></div>
+    <div class="m-card rev"><div class="m-label">전환 매출액 (ROAS)</div><div class="m-value" id="totRev">₩0 (0%)</div></div>
+  </div>
+
+  <div class="view-container">
+    <div class="chart-box">
+      <div class="loading-overlay" id="chartLoader"><div class="spinner"></div></div>
+      <div class="box-header"><span class="box-title" id="chartTitle">일별 추이</span></div>
+      <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+    </div>
+
+    <div class="table-box">
+      <div class="loading-overlay" id="tableLoader"><div class="spinner"></div></div>
+      <div class="table-header">
+        <div class="breadcrumb" id="breadcrumb"></div>
+        <div class="tag green" id="levelTag">CAMPAIGN</div>
+      </div>
+      <div class="table-scroll">
+        <table id="mainTable">
+          <thead>
+            <tr>
+              <th>목록명</th>
+              <th>광고비</th>
+              <th>노출</th>
+              <th>클릭</th>
+              <th>전환</th>
+              <th>매출</th>
+              <th>CTR</th>
+              <th>ROAS</th>
+              <th>CPC</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+let ST = {
+  mode: 'naver',
+  from: '2026-03-01',
+  to: '2026-03-31',
+  metric: 'spend',
+  level: 'CAMPAIGN',
+  campaignId: null,
+  adgroupId: null,
+  campaignName: '',
+  adgroupName: '',
+  data: { summary: [], list: [] }
+};
+let chart = null;
+
+const d = new Date();
+ST.to = d.toISOString().split('T')[0];
+d.setDate(d.getDate() - 30);
+ST.from = d.toISOString().split('T')[0];
+document.getElementById('dateFrom').value = ST.from;
+document.getElementById('dateTo').value = ST.to;
+
+async function refresh() {
+  hideErr();
+  document.getElementById('statusText').textContent = '데이터 갱신 중...';
+  document.getElementById('chartLoader').classList.add('show');
+  document.getElementById('tableLoader').classList.add('show');
+
+  try {
+    const q = `dateFrom=${ST.from.replace(/-/g,'')}&dateTo=${ST.to.replace(/-/g,'')}`;
+    let summaryUrl = `${API}/daily-summary?${q}`;
+    if (ST.level === 'ADGROUP') summaryUrl += `&idType=CAMPAIGN&targetId=${ST.campaignId}`;
+    if (ST.level === 'AD') summaryUrl += `&idType=ADGROUP&targetId=${ST.adgroupId}`;
+    
+    const sRes = await fetch(summaryUrl);
+    const sData = await sRes.json();
+    if (!Array.isArray(sData)) throw new Error('Summary data is not an array');
+    ST.data.summary = sData;
+
+    let listUrl = `${API}/campaign-stats?${q}`;
+    if (ST.level === 'ADGROUP') listUrl = `${API}/adgroups?campaignId=${ST.campaignId}&${q}`;
+    if (ST.level === 'AD') listUrl = `${API}/ads?adgroupId=${ST.adgroupId}&${q}`;
+    
+    const lRes = await fetch(listUrl);
+    const lData = await lRes.json();
+    const rows = lData.rows || [];
+    if (!Array.isArray(rows)) throw new Error('List data is not an array');
+    ST.data.list = rows;
+
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+    document.getElementById('statusText').textContent = '연결됨';
+    render();
+  } catch (e) {
+    showErr('연결 오류: ' + e.message);
+    document.getElementById('statusText').textContent = '연결 끊김';
+  } finally {
+    document.getElementById('chartLoader').classList.remove('show');
+    document.getElementById('tableLoader').classList.remove('show');
+  }
+}
+
+function render() {
+  renderSummary();
+  renderChart();
+  renderTable();
+  renderBreadcrumb();
+}
+
+function renderSummary() {
+  const d = ST.data.list;
+  const s = d.reduce((acc, r) => acc + r.spend, 0);
+  const i = d.reduce((acc, r) => acc + r.impressions, 0);
+  const cl = d.reduce((acc, r) => acc + r.clicks, 0);
+  const co = d.reduce((acc, r) => acc + r.conversions, 0);
+  const rv = d.reduce((acc, r) => acc + r.revenue, 0);
+
+  document.getElementById('totSpend').textContent = '₩' + s.toLocaleString();
+  document.getElementById('totImp').textContent = `${i.toLocaleString()} / ${cl.toLocaleString()}`;
+  document.getElementById('totConv').textContent = co.toLocaleString();
+  document.getElementById('totRev').textContent = `₩${rv.toLocaleString()} (${s>0?Math.round(rv/s*100):0}%)`;
+}
+
+function renderChart() {
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  const d = ST.data.summary;
+  const labels = d.map(r => r.date_or_name.slice(5));
+  const values = d.map(r => ST.metric === 'roas' ? r.roas : r[ST.metric] || 0);
+
+  const labelMap = { spend: '광고비', clicks: '클릭', conversions: '전환', roas: 'ROAS' };
+  document.getElementById('chartTitle').textContent = `일별 ${labelMap[ST.metric]} 추이`;
+
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: labelMap[ST.metric],
+        data: values,
+        borderColor: '#5b8ff9',
+        backgroundColor: 'rgba(91,143,249,0.1)',
+        fill: true,
+        tension: 0.4,
+        borderWidth: 2,
+        pointRadius: labels.length > 20 ? 0 : 3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#5a6380', font: { size: 10 } } },
+        y: { grid: { color: 'rgba(46,54,80,0.4)' }, ticks: { color: '#5a6380', font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function renderTable() {
+  const tbody = document.getElementById('tableBody');
+  const rows = ST.data.list;
+  document.getElementById('levelTag').textContent = ST.level;
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:50px;color:var(--text3)">데이터를 찾을 수 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td class="${ST.level !== 'AD' ? 'clickable' : ''}" onclick="drillDown('${r.id}', '${r.name}')">
+        ${r.name}
+      </td>
+      <td>₩${r.spend.toLocaleString()}</td>
+      <td>${r.impressions.toLocaleString()}</td>
+      <td>${r.clicks.toLocaleString()}</td>
+      <td>${r.conversions.toLocaleString()}</td>
+      <td>₩${r.revenue.toLocaleString()}</td>
+      <td>${r.ctr}%</td>
+      <td style="color:${r.roas > 500 ? 'var(--success)' : 'inherit'}">${r.roas}%</td>
+      <td>₩${r.cpc.toLocaleString()}</td>
+    </tr>
+  `).join('');
+}
+
+function renderBreadcrumb() {
+  const bc = document.getElementById('breadcrumb');
+  let html = `<span class="bc-item ${ST.level === 'CAMPAIGN' ? 'active' : ''}" onclick="goLevel('CAMPAIGN')">캠페인 전체</span>`;
+  if (ST.level === 'ADGROUP' || ST.level === 'AD') {
+    html += `<span class="bc-sep">/</span><span class="bc-item ${ST.level === 'ADGROUP' ? 'active' : ''}" onclick="goLevel('ADGROUP')">${ST.campaignName}</span>`;
+  }
+  if (ST.level === 'AD') {
+    html += `<span class="bc-sep">/</span><span class="bc-item active">${ST.adgroupName}</span>`;
+  }
+  bc.innerHTML = html;
+}
+
+function drillDown(id, name) {
+  if (ST.level === 'CAMPAIGN') {
+    ST.level = 'ADGROUP';
+    ST.campaignId = id;
+    ST.campaignName = name;
+  } else if (ST.level === 'ADGROUP') {
+    ST.level = 'AD';
+    ST.adgroupId = id;
+    ST.adgroupName = name;
+  } else return;
+  refresh();
+}
+
+function goLevel(lv) {
+  if (lv === 'CAMPAIGN') {
+    ST.level = 'CAMPAIGN';
+    ST.campaignId = null; ST.adgroupId = null;
+  } else if (lv === 'ADGROUP') {
+    ST.level = 'ADGROUP';
+    ST.adgroupId = null;
+  }
+  refresh();
+}
+
+function setMode(m) {
+  ST.mode = m;
+  document.getElementById('modeSample').classList.toggle('active', m === 'sample');
+  document.getElementById('modeNaver').classList.toggle('active', m === 'naver');
+  if (m === 'naver') refresh();
+}
+
+function showErr(msg) {
+  const b = document.getElementById('errBox');
+  b.textContent = msg;
+  b.style.display = 'block';
+}
+function hideErr() { document.getElementById('errBox').style.display = 'none'; }
+
+document.getElementById('metricTabs').addEventListener('click', (e) => {
+  if (!e.target.dataset.m) return;
+  document.querySelectorAll('#metricTabs .btn-tab').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  ST.metric = e.target.dataset.m;
+  renderChart();
+});
+
+document.getElementById('dateFrom').addEventListener('change', (e) => { ST.from = e.target.value; refresh(); });
+document.getElementById('dateTo').addEventListener('change', (e) => { ST.to = e.target.value; refresh(); });
+
+refresh();
+</script>
+</body>
+</html>
